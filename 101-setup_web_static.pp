@@ -1,28 +1,63 @@
-# puppet manifest preparing a server for static content deployment
-exec { 'Update server':
-  command => '/usr/bin/env apt-get -y update',
+# Setup the web servers for the deployment of web_static
+exec { '/usr/bin/env apt -y update' : }
+-> package { 'nginx':
+  ensure => installed,
 }
--> exec {'Install NGINX':
-  command => '/usr/bin/env apt-get -y install nginx',
+-> file { '/data':
+  ensure  => 'directory'
 }
--> exec {'Creates directory release/test':
-  command => '/usr/bin/env mkdir -p /data/web_static/releases/test/',
+-> file { '/data/web_static':
+  ensure => 'directory'
 }
--> exec {'Creates directories shared':
-  command => '/usr/bin/env mkdir -p /data/web_static/shared/',
+-> file { '/data/web_static/releases':
+  ensure => 'directory'
 }
--> exec {'Write Hello World in index with tee command':
-  command => '/usr/bin/env echo "Hello Wolrd Puppet" | sudo tee /data/web_static/releases/test/index.html',
+-> file { '/data/web_static/releases/test':
+  ensure => 'directory'
 }
--> exec {'Create Symbolic link':
-  command => '/usr/bin/env ln -sf /data/web_static/releases/test /data/web_static/current',
+-> file { '/data/web_static/shared':
+  ensure => 'directory'
 }
--> exec {'Change owner and group like ubuntu':
-  command => '/usr/bin/env chown -R ubuntu:ubuntu /data',
+-> file { '/data/web_static/releases/test/index.html':
+  ensure  => 'present',
+  content => "<!DOCTYPE html>
+<html>
+  <head>
+  </head>
+  <body>
+    <p>Nginx server test</p>
+  </body>
+</html>"
 }
--> exec {'Add new configuration to NGINX':
-  command => '/usr/bin/env sed -i "/listen 80 default_server;/a location /hbnb_static/ { alias /data/web_static/current/;}" /etc/nginx/sites-available/default',
+-> file { '/data/web_static/current':
+  ensure => 'link',
+  target => '/data/web_static/releases/test'
 }
--> exec {'Restart NGINX':
-  command => '/usr/bin/env service nginx restart',
+-> exec { 'chown -R ubuntu:ubuntu /data/':
+  path => '/usr/bin/:/usr/local/bin/:/bin/'
+}
+-> file { '/var/www':
+  ensure => 'directory'
+}
+-> file { '/var/www/html':
+  ensure => 'directory'
+}
+-> file { '/var/www/html/index.html':
+  ensure  => 'present',
+  content => "<!DOCTYPE html>
+<html>
+  <head>
+  </head>
+  <body>
+    <p>Nginx server test</p>
+  </body>
+</html>"
+}
+exec { 'nginx_conf':
+  environment => ['data=\ \tlocation /hbnb_static {\n\t\talias /data/web_static/current;\n\t}\n'],
+  command     => 'sed -i "39i $data" /etc/nginx/sites-enabled/default',
+  path        => '/usr/bin:/usr/sbin:/bin:/usr/local/bin'
+}
+-> service { 'nginx':
+  ensure => running,
 }
